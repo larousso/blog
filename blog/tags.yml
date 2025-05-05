@@ -18,3 +18,23 @@ devflow:
   label: Dev flow
   permalink: /devflow
   description: Flow de dev
+
+kafka:
+  label: Kafka
+  permalink: /kafka
+  description: Kafka
+
+architecture:
+  label: Architecture
+  permalink: /architecture
+  description: Architecture
+
+patterns:
+  label: Patterns
+  permalink: /patterns
+  description: Patterns
+
+ddd:
+  label: DDD
+  permalink: /ddd
+  description: Domaine driven design
