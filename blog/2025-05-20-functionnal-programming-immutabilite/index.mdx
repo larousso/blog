@@ -1,0 +1,228 @@
+---
+slug: functional-programming-immutabilite
+title: prog fonct en java - immutabilité
+authors: [adelegue]
+tags: [patterns, java, prog-fonctionnelle]
+---
+
+Dans le post précédent, on a vu les fondations de la programmation fonctionnelle, ici, on va s'intéresser plus en détail à l'immutabilité en java.
+
+{/* truncate */}
+
+## L'instant musical
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/-1X73VmCj98?si=NxxgJSzWA5PvX7Yv" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+## Immutabilité
+
+Une façon de ne pas galérer avec les fonctions pures, c'est d'avoir des variables immutables. Mais comment ça se passe en java ?
+
+Il existe le mot clé `final` qui permet d'assurer qu'une variable ne pourra pas être réaffectée.
+Il peut être utilisé pour des variables, pour des attributs de classe et même pour des paramètres de méthode.
+On peut également l'utiliser lors de la définition d'une classe pour s'assurer que la classe ne sera pas étendue.
+
+### Les structures de données
+
+Traditionnellement en java, on représente des structures de données par des `bean`.
+Un bean déclare des attributs privés mutables et propose des getters et des setters pour respectivement accéder aux attributs et modifier les attributs.
+
+```java
+public class User {
+
+    private String nom;
+    private String email;
+
+    public String getNom() {
+        return nom;
+    }
+
+    public void setNom(String nom) {
+        this.nom = nom;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+}
+```
+
+En plus de la verbosité, ici, on est loins de l'immutabilité souhaitée !
+
+Une première approche serait de déclarer les attributs `final`, et tant qu'on y est, on va les déclarer `public`, comme ça, pas besoin de `getter`.
+
+```java
+public class User {
+
+    public String nom;
+    public String email;
+
+    public User(String nom, String email) {
+        this.nom = nom;
+        this.email = email;
+    }
+}
+```
+
+On peut même faire plus concis, en remplaçant la classe par un record :
+
+```java
+public record User(String nom, String email) {}
+```
+
+Les attributs du record sont immutables par défaut.
+
+Avoir des structures immutables ajoute une certaine sécurité et diminue la charge mentale lors du développement mais, elle vient avec un certain nombre de contraintes.
+
+Premièrement, comme il n'y a plus de setter, ça devient plus compliqué de modifier un attribut. Pour ça, on va devoir créer une nouvelle instance :
+
+```java
+public record User(String nom, String email) {
+    public User withNom(String nom) {
+        return new User(nom, email);
+    }
+    public User withEmail(String email) {
+        return new User(nom, email);
+    }
+}
+```
+
+Et donc, si on veut modifier l'email d'un user :
+
+```java
+var user = new User("Milo", "milo@gmail.com");
+var userWithNameUpdated = user.withEmail("milo.aukerman@gmail.com");
+```
+Dans les futures versions de java, on devrait directment avoir le mot clé `with` :
+```java
+var user = new User("Milo", "milo@gmail.com");
+var userWithNameUpdated = user with { email = "milo.aukerman@gmail.com" };
+```
+Mais il va falloir attendre un peu...
+
+
+On peut vite se rendre compte que ça devient assez difficile de modifier la feuille d'une structure un peu plus complèxe :
+
+```java
+var userUpdated = user
+        .withAddress(user.address
+            .withCity(
+                user.address.city.withZipCode("79000")
+            )
+        );
+```
+En programmation fonctionnelle, il existe ce qu'on appelle les optics pour modifier facilement des structures arborescentes (peut être le sujet d'un article futur !). Malheureusement, il n'existe aucune implémentation en java.
+
+
+Nous venons de voir comment créer nos propres structures immutables, mais que propose java en terme d'immutabilité dans le jdk ?
+
+Un type de donnée très fréquemment utilisé, ce sont les `java.util.List` et plus largement les collections.
+
+### Les collections
+
+La gestion de l'immutabilité dans l'API de collection n'est clairement pas au niveau.
+Java propose des utilitaires pour vérrouiller des collections, mais pas vraiment d'outils pour pouvoir les modifier.
+
+Il existe par exemple `Collections.unmodifiableList` :
+
+```java
+ArrayList<String> list = new ArrayList<>();
+list.add("a");
+List<String> immutableList = Collections.unmodifiableList(list);
+immutableList.add("b");
+```
+💥🧨💣Ici, on va obtenir
+```
+java.lang.UnsupportedOperationException
+	at java.base/java.util.Collections$UnmodifiableCollection.add(Collections.java:1091)
+```
+
+D'ailleurs, dans certains cas, ce sont directement des listes immutables qui sont créées :
+
+```java
+List<String> immutableList = List.of("a");
+immutableList.add("b");
+```
+
+Même résultat :
+
+```
+java.lang.UnsupportedOperationException
+	at java.base/java.util.Collections$UnmodifiableCollection.add(Collections.java:1091)
+```
+
+Perso, je trouve ce comportement assez angoissant, on ne sait jamais quand la manipulation d'une liste va nous péter à la gueule…
+
+Dans le paragraphe précédent, quand on voulait modifier une structure, il fallait créer une nouvelle instance avec la valeur modifiée.
+Est-ce qu'on ne pourrait pas faire de même avec les listes ?
+
+Et bien la solution, c'est d'utiliser la syntaxe suivante :
+
+```java
+List<String> immutableList = List.of("a");
+List<String> newList = Stream
+    .concat(
+        immutableList.stream(),
+        Stream.of("b")
+    )
+    .toList();
+```
+
+Ça fonctionne, mais ça reste assez verbeux.
+
+Quand on commence à vraiment utiliser des collections immutables, l'API' de collections de la lib [`vavr`](https://vavr.io/) est largement au-dessus du jdk.
+
+Vavr a porté toute l'API de collection de scala en java et les collections proposées sont immutables par défaut :
+
+```java
+List<String> empty = List.empty();
+List<String> unElement = empty.append("a");
+List<String> deuxElements = unElement.append("b");
+```
+Ici, pas de mauvaises surprises ! Comme par exemple, des exceptions qui nous pètent à la gueule.
+
+#### Impacts de l'immutabilité
+
+Comme pour les structures immutables, l'immutabilité dans les collections vient avec son lot de manipulations un peu tricky.
+
+Un cas d'école, incrémenter un compteur en parcourant une liste :
+
+```java
+int i = 0;
+for (String elt : list) {
+    i = i + elt.length();
+}
+```
+
+N'est plus possible en version immutable. Le code suivant ne compile plus :
+
+```java
+final int i = 0;
+for (String elt : list) {
+    i = i + elt.length();
+}
+```
+
+Il faudra écrire en java standard :
+
+```java
+Integer res = list.stream()
+    .reduce(0, (acc, elt) ->  acc + elt.length(), Integer::sum);
+```
+
+Et ça avec vavr (pas besoin de gérer le cas de la parallélisation comme avec java std) :
+
+```java
+Integer res = list.foldLeft(0, (acc, elt) ->  acc + elt.length());
+```
+
+Sur plein d'aspect, l'API de collections de vavr permettra de gérer plus simplement tout un tas d'opérations.
+Elle vient avec plein de méthodes out of box, contrairement au jdk :
+* `find`, `distinct`, `distinctBy`, `groupBy` `max`, `count` ...
+
+Les gatherer ont été introduits, dans la dernière version de java, ça rendra peut-être l'utilisation native des collections plus utilisable.
+
+
