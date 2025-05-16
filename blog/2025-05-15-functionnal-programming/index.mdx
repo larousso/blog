@@ -1,0 +1,334 @@
+---
+slug: functional-programming-intro
+title: La programmation fonctionnelle en java
+authors: [adelegue]
+tags: [patterns, java, prog-fonctionnelle]
+---
+
+import img from './img/img.png'
+import lego from './img/lego-516559_640.jpg';
+
+# La programmation fonctionnelle en java
+
+La version 8 du jdk a amené la programmation fonctionnelle en java, notamment, avec les fameuses lambda et les streams pour les collections.
+
+Mais peut-on réellement faire de la prog fonctionnelle en java ?
+Dans ce post, on fera un tour de quelques notions de prog fonctionnelle et on verra ce qu'on peut faire en java.
+
+{/* truncate */}
+
+## L'instant musical
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/zYwCmcB0XMw?si=10p-SuRij0U20Mdq" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+## Fonctions pures, fonctions totales et transparence référentielle
+
+En programmation fonctionnelle, on parle de manipulation de fonctions (pas con, en même temps, c'est dans le nom !). Les fonctions peuvent avoir plusieurs propriétés, elles peuvent être
+* Pures
+* Totales
+* Référentiellement transparentes
+
+### Fonctions pures
+
+Pour qu'une fonction soit pure :
+* Sa valeur de retour doit toujours être la même pour les mêmes arguments en entrée
+* Elle ne doit pas avoir d'effet de bord : pas d'effet sur des variables en dehors du scope de la fonction.
+
+Par exemple, cette fonction est pure :
+```java
+int additionner(int a, int b) {
+    return a + b;
+}
+```
+
+Si on exécute plusieurs fois `additionner(2, 3)` on obtiendra toujours `5`.
+Aucune manipulation de variable externe, donc pas d'effet de bord.
+
+### Transparence référentielle
+
+La transparence référentielle, c'est lorsque substituer une fonction par une variable ne change pas le comportement du programme.
+Les fonctions pures sont référentiellement transparente. Une fonction est pure si, toutes les expressions impliquées dans la fonction sont référentiellement transparente.
+
+Comme ça, ça peut paraître un peu flou, mais on va prendre un exemple.
+
+On va commencer par définir un tuple :
+```java
+record Tuple<A, B>(A a, B a) {
+    static <A, B> Tuple<A, B> of(A a, B b) {
+        return new Tuple<>(a, b);
+    }
+}
+```
+
+Maintenant, on va regarder si `addtionner` respecte la transparence référentielle. Pour ça t1 et t2 doivent être équivalent :
+
+```java
+var result = additionner(2, 3);
+var t1 = Tuple.of(result, result);
+var t2 = Tuple.of(additionner(2, 3), additionner(2, 3));
+```
+Ici, c'est le cas, `addtionner` est **référentiellement transparente**.
+
+Maintenant imaginons la fonction suivante :
+
+```java
+static <T> T getValue(Iterator<T> iterator) {
+    if (iterator.hasNext()) {
+        return iterator.next();
+    } else {
+        return null;
+    }
+}
+```
+
+On va regarder si cette fonction est référentiellement transparente :
+
+```java
+var iterator = List.of(1, 2, 3, 4, 5, 6).iterator();
+var result = getValue(iterator);
+
+var t1 = Tuple.of(result, result);
+var t2 = Tuple.of(getValue(iterator), getValue(iterator));
+```
+
+Ici la fonction est **référentiellement opaque**. À chaque éxécution, on fait avancer l'`iterator` et on obtiendra des résultats et des comportements différents.
+
+### Fonction totales
+
+On va appeler fonction totale, une fonction qui retournera un résultat pour l'ensemble des valeurs possibles en entrée.
+
+La fonction `additionner`, est une fonction totale :
+```java
+int additionner(int a, int b) {
+    return a + b;
+}
+```
+Elle retournera un résultat pour la totalité des entiers.
+
+
+La fonction `diviser`, définie ainsi n'est pas totale :
+
+```java
+int diviser(int value, int par) {
+    return value / par;
+}
+```
+
+En effet, la division par `0` n'est pas possible. Pour rendre cette fonction totale, il faudra l'écrire :
+
+```java
+int diviser(int value, NonZeroInt par) {
+    return value / par;
+}
+```
+
+Avec par exemple :
+```java
+record NonZeroInt(int value) {
+    public NonZeroInt {
+        if (value == 0) throw new IllegalArgumentException("0 n'est pas authorisé");
+    }
+}
+```
+
+
+## Composition de fonction
+
+Un truc cool avec les fonctions, c'est qu'elles peuvent être composée. À partir de petites pièces, on peut fabriquer des pièces plus grosses et ainsi de suite.
+
+<img src={lego} width={400}></img>
+
+La bonne nouvelle, c'est qu'en java, c'est possible ! L'interface fonctionnelle `java.util.Function` (ainsi que `java.util.BiFunction`) a une méthode `andThen` qui permet de faire de la composition.
+
+Imaginons les fonctions suivantes :
+* `fabriquerBrique` : `🌍 -> 🧱`
+* `fabriquerMaison` : `🧱-> 🏠`
+
+En composant ces 2 fonctions, on est capable de construire une maison :
+
+`fabriquerMaisonDeZéro` : `🌍-> 🏠`
+>    = `🌍 -> 🧱 puis 🧱-> 🏠`
+
+>    = `fabriquerBrique` ° `fabriquerMaison`
+
+<a href="https://typelevel.org/cats/" target="_blank"><img src="https://typelevel.org/cats/img/cats2.png" /></a>
+
+En code java, on aura :
+
+```java
+Function<Argile, Brique> fabriquerBrique = ???;
+Function<Brique, Maison> fabriquerMaison = ???;
+
+Function<Argile, Maison> fabriquerMaisonDeZero = fabriquerBrique.andThen(fabriquerMaison);
+```
+
+## Fonctions d'ordre supérieur
+
+Une fonction d'ordre supérieur est
+* soit une fonction qui prend en paramètre une fonction
+* soit une fonction qui retourne une fonction
+
+C'est devenu, très courant en java. On pense par exemple à l'API de stream avec les fonctions `map`, `flatMap`, `filter` etc.
+
+## Curryfication et application partielle
+
+En java, quand une fonction ou une méthode a plusieurs arguments, on l'écrit généralement comme ça
+
+```java
+int additionner(int a, int b) {
+    return a + b;
+}
+```
+
+Alors qu'en haskell, on écrira plutôt quelque chose comme ça :
+```haskell
+additionner:: Int -> Int -> Int
+additionner = a  -> b -> a + b
+```
+
+Ce qui revient à écrire ça en java :
+```java
+Function<Integer, Function<Integer, Integer>> additionner = a -> b -> a + b;
+
+// Si on veut s'en servir :
+Integer deuxPlusTrois = additionner.apply(2).apply(3);
+```
+
+On vient de transformer une fonction qui prend un tuple d'entier et qui retourne un entier en une fonction, qui retourne une fonction, qui retourne un entier.
+
+On appel ça la curryfication.
+
+<img src={"https://upload.wikimedia.org/wikipedia/commons/2/27/Stephen_Curry_Shooting_%28cropped%29.jpg"} width={300}/>
+
+Un des avantages de la curryfication, c'est de pouvoir faire de l'application partielle.
+Par exemple, on peut créer une fonction `plus2` en faisant :
+
+```java
+Function<Integer, Function<Integer, Integer>> additionner = a -> b -> a + b;
+// Application partielle :
+Function<Int, Int> plusDeux = additionner.apply(2);
+
+// On peut utiliser notre fonction plusDeux :
+Integer deuxPlusTrois = plusDeux.apply(3);
+```
+
+L'application partielle, c'est un peu ce que font nos classes en java. Le constructeur va capter un contexte qui pourra être utilisé plus tard avec les méthodes de classe.
+
+En règle générale, java n'est pas très adapté pour la curryfication, la syntaxe est un peu trop lourde.
+
+On aimerait pouvoir écrire :
+```java
+Integer deuxPlusTrois = additionner(2)(3);
+```
+À la place de :
+```java
+Integer deuxPlusTrois = additionner.apply(2).apply(3);
+```
+
+D'ailleurs, dans scala, c'est juste du sucre syntaxique. Pour les méthodes qui s'appellent `apply`, on peut remplacer `foo.apply(bar)` par `foo(bar)`. Ça allège grandement le code.
+
+Autre point négatif en java, on aimerait pouvoir remplacer
+```java
+Function<Integer, Function<Integer, Integer>> additionner = a -> b -> a + b;
+```
+
+Par
+
+```java
+Integer -> Integer -> Integer additionner = a -> b -> a + b;
+```
+
+Comme c'est le cas en kotlin ou en scala.
+
+Il existe quand même certains use cases ou l'application partielle de fonction est utile : c'est dans les lambdas.
+
+Par exemple, dans un stream, à la place de :
+
+```java
+var context = UnContexteDeLExterieur();
+
+list
+    .stream()
+    .map(value -> faitQuelqueChose(context, value))
+    .toList();
+```
+
+On pourra écrire :
+
+```java
+var context = UnContexteDeLExterieur();
+
+list
+    .stream()
+    .map(faitQuelqueChose(context))
+    .toList();
+```
+avec
+
+```java
+static Function<String, Int> faitQuelqueChose(UnContexteDeLExterieur context) {
+    return str -> {
+      if (context.bar()) {
+          return str.length();
+      } else {
+          return 42;
+      }
+    };
+}
+```
+Ici, c'est une méthode qui retourne une fonction, c'est presque de la curryfication.
+
+## Vavr
+
+[Vavr](https://vavr.io/) est une librairie java très utile pour faire du fonctionnel en java. Vavr est un portage d'une partie du SDK du langage scala.
+
+On va y retrouver des `Option`, `Either`, `Try` dont on parlera plus tard, une API de collections immutable, des Tuples etc.
+
+Ce qui va nous intéresser ici, ce sont les fonctions. Dans le jdk, on va trouver nativement
+* `java.util.function.Function` : `a -> b`
+* `java.util.function.BiFunction` : `(a, b) -> c`
+* `java.util.function.Supplier` : `() -> a`
+* `java.util.function.Consumer` : `a -> {}`
+* `java.lang.Runnable` : `() -> {}`
+* `java.util.function.Predicate` : `a -> true|false`
+* `java.util.function.BiPredicate` : `(a, b) -> true|false`
+
+C'est une bonne base, mais on va se trouver limité pour un usage plus avancé.
+Un point important, on ne peut pas lever de "CheckedException" dans les fonctions natives du JDK.
+
+De son côté vavr va proposer :
+* `Function0` : `() -> a`
+* `Function1` : `a -> b`
+* `Function2` : `(a, b) -> c`
+* ...
+* `Function8` : `(a, b, c, d, e, f, g, h) -> j`
+
+Les checkedFunction pour pouvoir lever des exceptions dans une lambda
+* `CheckedFunction0` : `() -> a`
+* `CheckedFunction1` : `a -> b`
+* `CheckedFunction2` : `(a, b) -> c`
+* ...
+* `CheckedFunction8` : `(a, b, c, d, e, f, g, h) -> j`
+
+Chaque fonction expose une méthode de curryfication pour par exemple, passer de `(a, b) -> c` à `a -> b -> c`.
+
+On peut aussi, nativement faire de l'application partielle, sans passer par la curryfication :
+
+```java
+Function3<Integer, Integer, Integer, Integer> addition = (a, b, c) -> a + b + c;
+Function2<Integer, Integer, Integer> addition2 = sum.apply(2);
+
+var r = addition2.apply(4, 5);
+// 11
+```
+
+## Aller plus haut
+
+<img src={img} width={400} />
+
+Ici, on a vu quelques propriétés que peuvent avoir les fonctions et qui peuvent nous guider pour faire les choses un peu plus proprement.
+Mais en l'état, on n'ira pas très loin pour coder une application complète avec ce qu'on vient de voir.
+
+Pour utiliser des fonctions pures et référentiellement transparentes, il nous faudra des armes supplémentaires comme l'immutabilité, la gestion des effets de bords, utiliser le système de type, etc.
+
+Pour compléter ce post qui sert d'introduction, des posts dédiés pour détailler chaque item seront publiés. On pourra ensuite assembler brique par brique nos fonctions et créer un programme complet et robuste.
