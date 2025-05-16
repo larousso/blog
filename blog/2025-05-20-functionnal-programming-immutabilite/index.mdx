@@ -5,7 +5,7 @@ authors: [adelegue]
 tags: [patterns, java, prog-fonctionnelle]
 ---
 
-Dans le post précédent, on a vue les fondations de la programmation fonctionnelle, ici on va s'intéresser plus en détail à l'immutabilité en java.
+Dans le post précédent, on a vu les fondations de la programmation fonctionnelle, ici, on va s'intéresser plus en détail à l'immutabilité en java.
 
 {/* truncate */}
 
@@ -96,6 +96,13 @@ Et donc, si on veut modifier l'email d'un user :
 var user = new User("Milo", "milo@gmail.com");
 var userWithNameUpdated = user.withEmail("milo.aukerman@gmail.com");
 ```
+Dans les futures versions de java, on devrait directment avoir le mot clé `with` :
+```java
+var user = new User("Milo", "milo@gmail.com");
+var userWithNameUpdated = user with { email = "milo.aukerman@gmail.com" };
+```
+Mais il va falloir attendre un peu...
+
 
 On peut vite se rendre compte que ça devient assez difficile de modifier la feuille d'une structure un peu plus complèxe :
 
@@ -107,8 +114,10 @@ var userUpdated = user
             )
         );
 ```
+En programmation fonctionnelle, il existe ce qu'on appelle les optics pour modifier facilement des structures arborescentes (peut être le sujet d'un article futur !). Malheureusement, il n'existe aucune implémentation en java.
 
-Nous venons de voir comment créer nos structures immutables, mais que propose java dans le jdk ?
+
+Nous venons de voir comment créer nos propres structures immutables, mais que propose java en terme d'immutabilité dans le jdk ?
 
 Un type de donnée très fréquemment utilisé, ce sont les `java.util.List` et plus largement les collections.
 
@@ -125,7 +134,7 @@ list.add("a");
 List<String> immutableList = Collections.unmodifiableList(list);
 immutableList.add("b");
 ```
-Ici, on va obtenir
+💥🧨💣Ici, on va obtenir
 ```
 java.lang.UnsupportedOperationException
 	at java.base/java.util.Collections$UnmodifiableCollection.add(Collections.java:1091)
@@ -154,7 +163,12 @@ Et bien la solution, c'est d'utiliser la syntaxe suivante :
 
 ```java
 List<String> immutableList = List.of("a");
-List<String> newList = Stream.concat(immutableList.stream(), Stream.of("b")).toList();
+List<String> newList = Stream
+    .concat(
+        immutableList.stream(),
+        Stream.of("b")
+    )
+    .toList();
 ```
 
 Ça fonctionne, mais ça reste assez verbeux.
@@ -168,11 +182,11 @@ List<String> empty = List.empty();
 List<String> unElement = empty.append("a");
 List<String> deuxElements = unElement.append("b");
 ```
-Ici, on n'aura pas de mauvaises surprises comme, par exemple, des exceptions qui nous pètent à la gueule.
+Ici, pas de mauvaises surprises ! Comme par exemple, des exceptions qui nous pètent à la gueule.
 
 #### Impacts de l'immutabilité
 
-Comme pour les structures immutables, l'immutabilité dans les collections vient avec son lot de manipulation un peu tricky.
+Comme pour les structures immutables, l'immutabilité dans les collections vient avec son lot de manipulations un peu tricky.
 
 Un cas d'école, incrémenter un compteur en parcourant une liste :
 
